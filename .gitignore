@@ -1,0 +1,44 @@
+# Environment
+.env
+.env.local
+.env.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+*.egg
+
+# Node
+node_modules/
+.next/
+out/
+
+# Job data
+.jobs/
+.cache/
+output/
+temp/
+
+# ML training data
+.training/
+
+# MediaPipe assets (large binary)
+assets/*.task
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Env / secrets
+*.pem
+*.key

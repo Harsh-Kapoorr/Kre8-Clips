@@ -1,0 +1,104 @@
+import unittest
+import sys
+import os
+import tempfile
+import shutil
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "frontend"))
+
+class TestAuth(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.test_dir = tempfile.mkdtemp()
+        os.environ["JWT_SECRET"] = "test-secret-key-for-testing-min-32-chars"
+        
+        import Database from "better-sqlite3"
+        db_path = os.path.join(cls.test_dir, "test.db")
+        cls.db = Database(db_path)
+        cls.db.pragma("journal_mode = WAL")
+        cls.db.exec("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                name TEXT NOT NULL,
+                plan TEXT DEFAULT 'free' NOT NULL,
+                clips_used INTEGER DEFAULT 0 NOT NULL,
+                deepgram_key TEXT,
+                gemini_key TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                refresh_token TEXT UNIQUE NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+        """)
+        
+    def test_00_signup_creates_user_and_returns_token(self):
+        from backend.auth.password import hashPassword
+        from backend.auth.db import createUser, findUserByEmail
+        
+        email = "testsignup@example.com"
+        password_hash = hashPassword("password123")
+        name = "Test User"
+        
+        user = createUser(email, password_hash, name)
+        
+        self.assertIsNotNone(user["id"])
+        self.assertEqual(user["email"], email.lower())
+        self.assertEqual(user["name"], name)
+        self.assertEqual(user["plan"], "free")
+        
+        found = findUserByEmail(email)
+        self.assertIsNotNone(found)
+        self.assertEqual(found["email"], email.lower())
+
+    def test_01_duplicate_email_returns_conflict(self):
+        from backend.auth.db import createUser, findUserByEmail
+        from backend.auth.password import hashPassword
+        
+        email = "duplicate@example.com"
+        createUser(email, hashPassword("pass123"), "User One")
+        
+        try:
+            createUser(email, hashPassword("pass456"), "User Two")
+            self.fail("Should have raised error")
+        except Exception:
+            pass
+
+    def test_02_login_with_wrong_password_returns_401(self):
+        from backend.auth.db import createUser, findUserByEmail
+        from backend.auth.password import hashPassword, verifyPassword
+        
+        email = "login@example.com"
+        createUser(email, hashPassword("correctpassword"), "Login User")
+        
+        user = findUserByEmail(email)
+        self.assertTrue(verifyPassword("correctpassword", user["password_hash"]))
+        self.assertFalse(verifyPassword("wrongpassword", user["password_hash"]))
+
+    def test_03_logout_clears_session(self):
+        from backend.auth.db import createSession, findSessionByToken, deleteSession
+        from backend.auth.password import hashPassword
+        from backend.auth.db import createUser
+        
+        user = createUser("logout@example.com", hashPassword("pass123"), "Logout User")
+        session = createSession(user["id"], "test_refresh_token_123")
+        
+        found = findSessionByToken("test_refresh_token_123")
+        self.assertIsNotNone(found)
+        
+        deleteSession("test_refresh_token_123")
+        
+        not_found = findSessionByToken("test_refresh_token_123")
+        self.assertIsNone(not_found)
+
+if __name__ == "__main__":
+    unittest.main()

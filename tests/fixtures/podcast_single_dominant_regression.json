@@ -1,0 +1,54 @@
+{
+  "name": "single_dominant_with_secondary",
+  "diarization_segments": [
+    {"start": 0.0, "end": 5.0, "speaker": "SPEAKER_0", "text": "Main host segment"},
+    {"start": 5.0, "end": 7.0, "speaker": "SPEAKER_1", "text": "Short guest interjection"},
+    {"start": 7.0, "end": 12.0, "speaker": "SPEAKER_0", "text": "Main host continues"}
+  ],
+  "face_detections": [
+    {
+      "time": 0.0,
+      "faces": [
+        {"track_id": 11, "x": 0.49, "y": 0.38, "area": 0.096, "speaking_score": 0.76}
+      ]
+    },
+    {
+      "time": 2.0,
+      "faces": [
+        {"track_id": 11, "x": 0.50, "y": 0.39, "area": 0.095, "speaking_score": 0.73}
+      ]
+    },
+    {
+      "time": 4.0,
+      "faces": [
+        {"track_id": 11, "x": 0.49, "y": 0.38, "area": 0.097, "speaking_score": 0.70}
+      ]
+    },
+    {
+      "time": 6.0,
+      "faces": [
+        {"track_id": 11, "x": 0.50, "y": 0.39, "area": 0.094, "speaking_score": 0.18},
+        {"track_id": 22, "x": 0.70, "y": 0.40, "area": 0.033, "speaking_score": 0.44}
+      ]
+    },
+    {
+      "time": 8.0,
+      "faces": [
+        {"track_id": 11, "x": 0.49, "y": 0.38, "area": 0.096, "speaking_score": 0.75}
+      ]
+    },
+    {
+      "time": 10.0,
+      "faces": [
+        {"track_id": 11, "x": 0.50, "y": 0.38, "area": 0.095, "speaking_score": 0.72}
+      ]
+    }
+  ],
+  "expected": {
+    "layout_type": "single_dominant",
+    "primary_track": 11,
+    "speaker_ranges": {
+      "SPEAKER_0": {"min_x": 0.44, "max_x": 0.56}
+    }
+  }
+}

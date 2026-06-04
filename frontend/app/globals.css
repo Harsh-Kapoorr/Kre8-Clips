@@ -1,0 +1,421 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme inline {
+  /* ─── Single brand accent: vermillion ─── */
+  --color-accent: #ff5722;
+  --color-accent-hover: #ff7043;
+  --color-accent-pressed: #e64a19;
+  --color-accent-soft: rgba(255, 87, 34, 0.12);
+  --color-accent-glow: rgba(255, 87, 34, 0.40);
+  --color-accent-faint: rgba(255, 87, 34, 0.06);
+
+  /* ─── Surfaces ─── */
+  --color-ink: #0a0a0a;
+  --color-ink-deep: #050505;
+  --color-surface-1: #131313;
+  --color-surface-2: #1a1a1a;
+  --color-surface-3: #222222;
+  --color-surface-4: #2a2a2a;
+
+  /* ─── Text ─── */
+  --color-bone: #f5f4ef;
+  --color-bone-muted: #b8b6b0;
+  --color-bone-subtle: #8a8880;
+  --color-bone-faint: #555550;
+
+  /* ─── Hairlines ─── */
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.14);
+  --color-line-faint: rgba(255, 255, 255, 0.04);
+
+  /* ─── Fonts ─── */
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Instrument Serif", "Iowan Old Style", "Apple Garamond", Baskerville, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  --accent: #ff5722;
+  --accent-hover: #ff7043;
+  --accent-soft: rgba(255, 87, 34, 0.12);
+  --ink: #0a0a0a;
+  --ink-deep: #050505;
+  --bone: #f5f4ef;
+  --bone-muted: #b8b6b0;
+  --bone-subtle: #8a8880;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+}
+
+/* ─── Base ─── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ink);
+}
+
+body {
+  background: var(--ink);
+  color: var(--bone);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+  overflow-x: hidden;
+}
+
+/* ─── Display serif ─── */
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.serif-italic {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Editorial small caps label ─── */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-subtle);
+}
+
+.eyebrow-accent {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ─── Buttons (minimal, rectangular) ─── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: var(--accent);
+  color: #0a0a0a;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+  position: relative;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(255, 87, 34, 0.25);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  background: var(--accent-pressed);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1.5rem;
+  background: transparent;
+  color: var(--bone);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--bone);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: color 0.18s ease, gap 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-link:hover {
+  color: var(--accent);
+  gap: 0.625rem;
+}
+
+.btn-link .arrow {
+  transition: transform 0.2s ease;
+}
+
+.btn-link:hover .arrow {
+  transform: translateX(3px);
+}
+
+/* ─── Inline URL input (hero form) ─── */
+.hero-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.hero-input:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.hero-input:focus-within {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 3px rgba(255, 87, 34, 0.12);
+}
+
+.hero-input input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--bone);
+  font-size: 0.9375rem;
+  font-family: var(--font-sans);
+  padding: 0.625rem 0;
+}
+
+.hero-input input::placeholder {
+  color: var(--bone-faint);
+}
+
+.hero-input button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--accent);
+  color: #0a0a0a;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.hero-input button:hover {
+  background: var(--accent-hover);
+}
+
+.hero-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Section padding (editorial spacing) ─── */
+.section {
+  padding: 6rem 0;
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding: 8rem 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .section {
+    padding: 10rem 0;
+  }
+}
+
+/* ─── Hairline divider ─── */
+.hairline {
+  height: 1px;
+  background: var(--line);
+  width: 100%;
+}
+
+.hairline-vertical {
+  width: 1px;
+  background: var(--line);
+}
+
+/* ─── Marquee ─── */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  display: flex;
+  gap: 4rem;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+/* ─── Subtle grain texture ─── */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ─── Animated noise on hero gradient ─── */
+.hero-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.4;
+  will-change: transform;
+}
+
+@keyframes aurora-a {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -30px) scale(1.1); }
+}
+
+@keyframes aurora-b {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-60px, 40px) scale(0.95); }
+}
+
+.aurora-a { animation: aurora-a 20s ease-in-out infinite; }
+.aurora-b { animation: aurora-b 24s ease-in-out infinite; }
+
+/* ─── Number ticker ─── */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Custom checkbox / switch ─── */
+.switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  background: var(--surface-3);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.18s ease;
+  border: none;
+  padding: 0;
+}
+
+.switch[data-on="true"] {
+  background: var(--accent);
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--bone);
+  border-radius: 50%;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.switch[data-on="true"]::after {
+  transform: translateX(14px);
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* ─── Selection ─── */
+::selection {
+  background: var(--accent);
+  color: #0a0a0a;
+}
+
+/* ─── Focus ring ─── */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ─── Video player reset ─── */
+video::-webkit-media-controls { display: none !important; }
+
+/* ─── Reduce motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .marquee-track,
+  .aurora-a,
+  .aurora-b { animation: none !important; }
+}
