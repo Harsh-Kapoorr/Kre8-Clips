@@ -3,7 +3,12 @@ import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google"
 import { CustomCursor } from "@/components/custom-cursor"
 import { AuthInitializer } from "@/components/auth-initializer"
 import { ToastProvider } from "@/components/toast-provider"
+import { inject } from "@vercel/analytics"
+import { injectSpeedInsights } from "@vercel/speed-insights"
 import "./globals.css"
+
+inject()
+injectSpeedInsights()
 
 const inter = Inter({
   variable: "--font-sans",
@@ -30,6 +35,20 @@ export const metadata: Metadata = {
   title: "Kre8 Clips — Long videos into viral moments.",
   description:
     "Paste a YouTube URL. Get platform-ready clips in 90 seconds. AI analysis, speaker tracking, narrative assembly.",
+  keywords: ["youtube clipper", "video editing", "ai video", "content creation", "viral clips", "shorts"],
+  authors: [{ name: "Kre8 Clips" }],
+  openGraph: {
+    title: "Kre8 Clips — Long videos into viral moments.",
+    description: "Paste a YouTube URL. Get platform-ready clips in 90 seconds.",
+    type: "website",
+    locale: "en_US",
+    siteName: "Kre8 Clips",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Kre8 Clips",
+    description: "Turn long YouTube videos into viral short-form clips with AI.",
+  },
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✂️</text></svg>",
   },

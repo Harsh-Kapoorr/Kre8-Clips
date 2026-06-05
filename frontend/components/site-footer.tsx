@@ -28,6 +28,13 @@ const COLUMNS = [
       { label: "Contact", href: "#contact" },
     ],
   },
+  {
+    title: "Legal",
+    links: [
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+    ],
+  },
 ]
 
 const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
