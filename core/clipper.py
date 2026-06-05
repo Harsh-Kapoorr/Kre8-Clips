@@ -1218,32 +1218,38 @@ def build_tracking_segments_v2(
                         current_speaker = speaker
                         seg_start = t
             else:
-                # Check pixel movement first (prevents micro-cuts)
-                pixel_moved_x = abs(crop_x - current_crop[0])
-                pixel_moved_y = abs(crop_y - current_crop[1])
-                pixels_ok = pixel_moved_x >= min_pixel_threshold_x or pixel_moved_y >= min_pixel_threshold_y
-
-                # Check normalized movement threshold (8% of frame)
-                moved = (abs(crop_x - current_crop[0]) > movement_threshold_x or
-                        abs(crop_y - current_crop[1]) > movement_threshold_y)
-
-                if moved and pixels_ok and (t - seg_start) >= min_segment_duration:
-                    # Additional check: if movement is under 2% of frame, suppress cut
-                    small_move = (pixel_moved_x < source_w * 0.02) and (pixel_moved_y < source_h * 0.02)
-                    if small_move:
-                        t += 0.1
-                        continue
-
-                    # Validate current crop before adding
-                    if not is_valid_crop(current_crop[0], current_crop[1], current_x_norm, current_y_norm):
-                        # Replace with frame center crop
-                        current_crop = ((source_w - crop_w) // 2, (source_h - crop_h) // 2)
-
-                    segments.append((current_crop[0], current_crop[1], seg_start, t, current_zoom))
-                    current_crop = current_pos
+                if current_crop is None:
+                    current_crop = (crop_x, crop_y)
                     current_x_norm, current_y_norm = x_norm, y_norm
                     current_speaker = speaker
                     seg_start = t
+                else:
+                    # Check pixel movement first (prevents micro-cuts)
+                    pixel_moved_x = abs(crop_x - current_crop[0])
+                    pixel_moved_y = abs(crop_y - current_crop[1])
+                    pixels_ok = pixel_moved_x >= min_pixel_threshold_x or pixel_moved_y >= min_pixel_threshold_y
+
+                    # Check normalized movement threshold (8% of frame)
+                    moved = (abs(crop_x - current_crop[0]) > movement_threshold_x or
+                            abs(crop_y - current_crop[1]) > movement_threshold_y)
+
+                    if moved and pixels_ok and (t - seg_start) >= min_segment_duration:
+                        # Additional check: if movement is under 2% of frame, suppress cut
+                        small_move = (pixel_moved_x < source_w * 0.02) and (pixel_moved_y < source_h * 0.02)
+                        if small_move:
+                            t += 0.1
+                            continue
+
+                        # Validate current crop before adding
+                        if not is_valid_crop(current_crop[0], current_crop[1], current_x_norm, current_y_norm):
+                            # Replace with frame center crop
+                            current_crop = ((source_w - crop_w) // 2, (source_h - crop_h) // 2)
+
+                        segments.append((current_crop[0], current_crop[1], seg_start, t, current_zoom))
+                        current_crop = current_pos
+                        current_x_norm, current_y_norm = x_norm, y_norm
+                        current_speaker = speaker
+                        seg_start = t
 
         t += 0.1
 
