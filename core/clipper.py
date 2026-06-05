@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-from typing import Optional, List, Tuple, TYPE_CHECKING
+from typing import Optional, List, Tuple, Dict, TYPE_CHECKING
 import numpy as np
 from config.settings import (
     OUTPUT_DIR, DEFAULT_FORMAT, VIDEO_CODEC, AUDIO_CODEC,
@@ -9,6 +9,7 @@ from config.settings import (
 from utils.progress import console, print_success, print_warning
 from utils.validators import sanitize_filename
 from core.smoothing import CropSmoother
+from core.text_detector import TextDetector
 
 def snap_boundaries_to_pauses(
     segments: List[dict],
@@ -282,13 +283,19 @@ def generate_clip_with_tracking(
         print(f"SpeakerTracker: Two-person layout not triggered (simultaneous_pct={simultaneous_pct:.2f} < 0.25)")
         print(f"SpeakerTracker: Falling back to single-speaker tracking")
 
+    text_detector = TextDetector() if portrait_mode else None
+
     segments = build_tracking_segments_v2(
-        speaker_timeline, start_time, end_time,
-        target_w, target_h, source_w, source_h
+        video_path, start_time, end_time,
+        speaker_timeline,
+        target_w, target_h, source_w, source_h,
+        text_detector=text_detector,
     )
 
     if len(segments) == 1:
-        crop_x, crop_y, seg_start, seg_end = segments[0]
+        crop_x, crop_y, seg_start, seg_end, zoom = segments[0]
+        if zoom != 1.0:
+            crop_w, crop_h = get_crop_window_dimensions_with_zoom(source_w, source_h, target_w / target_h, zoom)
         video_filter = build_crop_filter(crop_w, crop_h, crop_x, crop_y, target_w, target_h)
         cmd = [
             "ffmpeg", "-y", "-ss", format_time(seg_start), "-i", str(video_path),
@@ -411,6 +418,23 @@ def get_crop_window_dimensions_for_ratio(
 
     crop_w = max(2, min(crop_w, source_w))
     crop_h = max(2, min(crop_h, source_h))
+    return crop_w, crop_h
+
+
+def get_crop_window_dimensions_with_zoom(
+    source_w: int,
+    source_h: int,
+    target_ratio: float,
+    zoom_factor: float = 1.0,
+) -> Tuple[int, int]:
+    """Crop size with optional zoom factor (>1 = zoom out)."""
+    crop_w, crop_h = get_crop_window_dimensions_for_ratio(source_w, source_h, target_ratio)
+    if zoom_factor != 1.0:
+        new_w = int(crop_w * zoom_factor)
+        new_h = int(crop_h * zoom_factor)
+        new_w = min(new_w, source_w)
+        new_h = min(new_h, source_h)
+        crop_w, crop_h = new_w, new_h
     return crop_w, crop_h
 
 
@@ -928,33 +952,66 @@ def format_time(seconds: float) -> str:
 
 
 def build_tracking_segments_v2(
-    speaker_timeline: List[Tuple],
+    video_path: Path,
     start_time: float,
     end_time: float,
+    speaker_timeline: List[Tuple],
     target_w: int,
     target_h: int,
     source_w: int,
     source_h: int,
+    text_detector=None,
     min_segment_duration: float = 1.5
-) -> List[Tuple[int, int, float, float]]:
-    """Build list of (crop_x, crop_y, start_time, end_time) segments.
+) -> List[Tuple[int, int, float, float, float]]:
+    """Build list of (crop_x, crop_y, start_time, end_time, zoom) segments.
+
     Timeline entries are at 0.1s resolution with direct positions (no re-interpolation).
     Uses simple nearest-sample lookup to avoid double interpolation drift.
 
     Cuts when movement exceeds threshold (8% of frame width/height).
     Minimum pixels threshold: 30px horizontal or 20px vertical.
     ALSO cuts when the active speaker changes, so portrait crops follow each speaker.
+
+    Args:
+        video_path: Path to video for text detection
+        text_detector: TextDetector instance for text-aware zoom
+        Returns: List of (crop_x, crop_y, start_time, end_time, zoom_factor)
     """
-    crop_w, crop_h = get_crop_window_dimensions_for_ratio(
+    base_crop_w, base_crop_h = get_crop_window_dimensions_for_ratio(
         source_w,
         source_h,
         target_w / target_h,
     )
 
+    crop_w = base_crop_w
+    crop_h = base_crop_h
+
     if not speaker_timeline:
         crop_x = (source_w - crop_w) // 2
         crop_y = (source_h - crop_h) // 2
-        return [(crop_x, crop_y, start_time, end_time)]
+        return [(crop_x, crop_y, start_time, end_time, 1.0)]
+
+    # Text detection pass: sample at 0.5s intervals, cache results
+    text_timestamps: Dict[float, List] = {}
+    if text_detector is not None:
+        import cv2
+        cap = cv2.VideoCapture(str(video_path))
+        if cap.isOpened():
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            sample_times = []
+            tt = start_time
+            while tt <= end_time + 0.01:
+                sample_times.append(round(tt, 3))
+                tt += 0.5
+            for ts in sample_times:
+                frame_num = int(ts * fps)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+                ok, frame = cap.read()
+                if ok:
+                    regions = text_detector.detect_frame(frame, ts)
+                    if regions:
+                        text_timestamps[round(ts, 3)] = regions
+            cap.release()
 
     def get_position_and_speaker_at_time(t):
         """Find nearest timeline entry, returning (x, y, speaker)."""
@@ -1066,6 +1123,7 @@ def build_tracking_segments_v2(
     current_crop = None
     current_x_norm, current_y_norm = None, None
     current_speaker = None
+    current_zoom = 1.0
     seg_start = start_time
 
     movement_threshold_x = source_w * 0.08
@@ -1077,27 +1135,88 @@ def build_tracking_segments_v2(
     while t < end_time:
         x_norm, y_norm, speaker = get_position_and_speaker_at_time(t)
 
+        # Get text regions for this timestamp
+        rounded_t = round(t, 3)
+        text_regions = text_timestamps.get(rounded_t, [])
+
         # If speaker changed, cut immediately so new speaker gets their own crop
         if current_speaker is not None and speaker != current_speaker:
             # Use the speaker's average face position (from when THEY were on screen)
             if speaker in speaker_avg_pos:
                 x_norm, y_norm = speaker_avg_pos[speaker]
             crop_x, crop_y = calculate_crop(x_norm, y_norm)
+
+            # Apply text-aware zoom
+            zoom = 1.0
+            if text_regions and text_detector:
+                zoom = text_detector.zoom_factor_for_regions(
+                    text_regions, source_w, source_h, x_norm, y_norm, crop_w, crop_h
+                )
+            if zoom != 1.0:
+                zoomed_w, zoomed_h = get_crop_window_dimensions_with_zoom(source_w, source_h, target_w / target_h, zoom)
+                zoom_offset_x = (zoomed_w - crop_w) // 2
+                zoom_offset_y = (zoomed_h - crop_h) // 2
+                crop_x = max(0, min(crop_x - zoom_offset_x, source_w - zoomed_w))
+                crop_y = max(0, min(crop_y - zoom_offset_y, source_h - zoomed_h))
+
             if current_crop is not None and (t - seg_start) >= 0.3:
-                segments.append((current_crop[0], current_crop[1], seg_start, t))
+                segments.append((current_crop[0], current_crop[1], seg_start, t, current_zoom))
                 current_crop = (crop_x, crop_y)
                 current_x_norm, current_y_norm = x_norm, y_norm
                 current_speaker = speaker
+                current_zoom = zoom
                 seg_start = t
         else:
             crop_x, crop_y = calculate_crop(x_norm, y_norm)
             current_pos = (crop_x, crop_y)
 
-            if current_crop is None:
-                current_crop = current_pos
-                current_x_norm, current_y_norm = x_norm, y_norm
-                current_speaker = speaker
-                seg_start = t
+            zoom = current_zoom
+            if text_regions:
+                zoom = text_detector.zoom_factor_for_regions(
+                    text_regions, source_w, source_h, x_norm, y_norm, crop_w, crop_h
+                )
+                current_zoom = zoom
+
+            if zoom != 1.0:
+                zoomed_w, zoomed_h = get_crop_window_dimensions_with_zoom(source_w, source_h, target_w / target_h, zoom)
+                zoom_offset_x = (zoomed_w - crop_w) // 2
+                zoom_offset_y = (zoomed_h - crop_h) // 2
+                adjusted_crop_x = crop_x - zoom_offset_x
+                adjusted_crop_y = crop_y - zoom_offset_y
+                adjusted_crop_x = max(0, min(adjusted_crop_x, source_w - zoomed_w))
+                adjusted_crop_y = max(0, min(adjusted_crop_y, source_h - zoomed_h))
+                if current_crop is None:
+                    current_crop = (adjusted_crop_x, adjusted_crop_y)
+                    current_x_norm, current_y_norm = x_norm, y_norm
+                    current_speaker = speaker
+                    seg_start = t
+                else:
+                    # Check pixel movement first (prevents micro-cuts)
+                    pixel_moved_x = abs(adjusted_crop_x - current_crop[0])
+                    pixel_moved_y = abs(adjusted_crop_y - current_crop[1])
+                    pixels_ok = pixel_moved_x >= min_pixel_threshold_x or pixel_moved_y >= min_pixel_threshold_y
+
+                    # Check normalized movement threshold (8% of frame)
+                    moved = (abs(adjusted_crop_x - current_crop[0]) > movement_threshold_x or
+                            abs(adjusted_crop_y - current_crop[1]) > movement_threshold_y)
+
+                    if moved and pixels_ok and (t - seg_start) >= min_segment_duration:
+                        # Additional check: if movement is under 2% of frame, suppress cut
+                        small_move = (pixel_moved_x < source_w * 0.02) and (pixel_moved_y < source_h * 0.02)
+                        if small_move:
+                            t += 0.1
+                            continue
+
+                        # Validate current crop before adding
+                        if not is_valid_crop(current_crop[0], current_crop[1], current_x_norm, current_y_norm):
+                            # Replace with frame center crop
+                            current_crop = ((source_w - crop_w) // 2, (source_h - crop_h) // 2)
+
+                        segments.append((current_crop[0], current_crop[1], seg_start, t, current_zoom))
+                        current_crop = (adjusted_crop_x, adjusted_crop_y)
+                        current_x_norm, current_y_norm = x_norm, y_norm
+                        current_speaker = speaker
+                        seg_start = t
             else:
                 # Check pixel movement first (prevents micro-cuts)
                 pixel_moved_x = abs(crop_x - current_crop[0])
@@ -1120,7 +1239,7 @@ def build_tracking_segments_v2(
                         # Replace with frame center crop
                         current_crop = ((source_w - crop_w) // 2, (source_h - crop_h) // 2)
 
-                    segments.append((current_crop[0], current_crop[1], seg_start, t))
+                    segments.append((current_crop[0], current_crop[1], seg_start, t, current_zoom))
                     current_crop = current_pos
                     current_x_norm, current_y_norm = x_norm, y_norm
                     current_speaker = speaker
@@ -1132,12 +1251,12 @@ def build_tracking_segments_v2(
         # Validate final crop
         if current_x_norm is not None and not is_valid_crop(current_crop[0], current_crop[1], current_x_norm, current_y_norm):
             current_crop = ((source_w - crop_w) // 2, (source_h - crop_h) // 2)
-        segments.append((current_crop[0], current_crop[1], seg_start, end_time))
+        segments.append((current_crop[0], current_crop[1], seg_start, end_time, current_zoom if current_crop is not None else 1.0))
 
     if not segments:
         crop_x = (source_w - crop_w) // 2
         crop_y = (source_h - crop_h) // 2
-        segments.append((crop_x, crop_y, start_time, end_time))
+        segments.append((crop_x, crop_y, start_time, end_time, 1.0))
 
     print(f"SpeakerTracker: Built {len(segments)} crop segments (rule of thirds)")
     return segments

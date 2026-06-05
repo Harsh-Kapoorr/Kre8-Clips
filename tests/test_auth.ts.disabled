@@ -12,7 +12,7 @@ class TestAuth(unittest.TestCase):
         cls.test_dir = tempfile.mkdtemp()
         os.environ["JWT_SECRET"] = "test-secret-key-for-testing-min-32-chars"
         
-        import Database from "better-sqlite3"
+        from better_sqlite3 import Database
         db_path = os.path.join(cls.test_dir, "test.db")
         cls.db = Database(db_path)
         cls.db.pragma("journal_mode = WAL")

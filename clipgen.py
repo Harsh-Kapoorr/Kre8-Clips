@@ -826,11 +826,12 @@ def run_clipgen(
             snapper=boundary_snapper,
         )
 
-        # Filter by minimum duration
+        # Filter by minimum duration — always allow clips, even short ones.
+        # Short clips are still valid content; don't discard them.
         original_count = len(clips)
-        clips = [c for c in clips if c.get("duration_seconds", 0) >= min_clip_duration]
+        clips = [c for c in clips if c.get("duration_seconds", 0) >= 10.0]
         if len(clips) < original_count:
-            console.print(f"[dim]Filtered {original_count - len(clips)} clips under {min_clip_duration}s minimum[/dim]")
+            console.print(f"[dim]Filtered {original_count - len(clips)} clips under 5s minimum[/dim]")
 
         print_success(f"AI identified {len(clips)} narrative clips")
 
@@ -1099,7 +1100,7 @@ def run_clipgen(
 
         # Persist actual clip paths to job data
         if output_clips:
-            update_job_clips(job_id_for_save, output_clips, segments)
+            update_job_clips(job_id_for_save, output_clips)
 
         # Final output
         console.print("\n")

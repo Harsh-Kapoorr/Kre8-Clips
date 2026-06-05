@@ -24,7 +24,7 @@ except ImportError:
     cv2 = None
 
 from core.face_detector import FaceDetection, FaceDetector
-from core.smoothing import CropSmoother
+from core.smoothing import CropSmoother, CinematicCropSmoother
 
 
 @dataclass
@@ -62,7 +62,13 @@ class KalmanState:
         )
 
     def update(self, zx: float, zy: float) -> "KalmanState":
-        """Update state with observation."""
+        """Update state with observation using Joseph form for numerical stability.
+
+        alpha blending: 30% observation, 70% prediction continuation.
+        This nudges the filter toward new detections rather than snapping,
+        preventing observation jumps when predictions accumulate.
+        """
+        alpha = 0.3
         H = np.array([
             [1, 0, 0, 0],
             [0, 1, 0, 0]
@@ -72,13 +78,25 @@ class KalmanState:
         z = np.array([zx, zy])
         state = np.array([self.x, self.y, self.vx, self.vy])
 
-        S = H @ self.P @ H.T + R
-        K = self.P @ H.T @ np.linalg.inv(S)
+        P = self.P
+        PHt = P @ H.T
+        S = H @ PHt + R
 
-        y_res = z - H @ state
-        new_state = state + K @ y_res
-        I = np.eye(4)
-        new_P = (I - K @ H) @ self.P
+        try:
+            sinv = np.linalg.inv(S)
+            K = PHt @ sinv
+        except np.linalg.LinAlgError:
+            K = PHt @ np.linalg.pinv(S)
+
+        innovation = z - H @ state
+        raw_update = K @ innovation
+
+        blended_update = alpha * raw_update
+
+        new_state = state + blended_update
+
+        I_KH = np.eye(4) - K @ H
+        new_P = I_KH @ P @ I_KH.T + K @ R @ K.T
 
         return KalmanState(
             x=new_state[0], y=new_state[1],
@@ -87,30 +105,107 @@ class KalmanState:
         )
 
 
+class RapidMovementDetector:
+    """Detects sudden speaker movement using Kalman velocity magnitude.
+
+    When movement is detected, the system increases detection frequency and
+    lowers smoothing to respond quickly. When movement stops, it returns to
+    normal smoothing for cinematic stability.
+    """
+
+    def __init__(
+        self,
+        velocity_threshold: float = 0.03,
+        acceleration_threshold: float = 0.06,
+    ):
+        self.velocity_threshold = velocity_threshold
+        self.acceleration_threshold = acceleration_threshold
+        self._prev_velocity_magnitude = 0.0
+        self._rapid_frames = 0
+        self._settling_frames = 0
+        self.is_rapid = False
+
+    def update(self, vx: float, vy: float, dt: float) -> bool:
+        """Update with Kalman velocity, return True if rapid movement."""
+        vel_magnitude = math.sqrt(vx * vx + vy * vy)
+        accel = abs(vel_magnitude - self._prev_velocity_magnitude) / dt if dt > 0 else 0
+
+        self.is_rapid = (
+            vel_magnitude > self.velocity_threshold or
+            accel > self.acceleration_threshold
+        )
+
+        if self.is_rapid:
+            self._rapid_frames += 1
+            self._settling_frames = 0
+        elif self._rapid_frames > 0:
+            self._settling_frames += 1
+            if self._settling_frames > 5:
+                self._rapid_frames = 0
+
+        self._prev_velocity_magnitude = vel_magnitude
+        return self.is_rapid
+
+    def rapid_factor(self) -> float:
+        """Return multiplier (0.0-1.0) for how much we're in rapid movement mode.
+
+        1.0 = full rapid mode (min smoothing, max responsiveness)
+        0.0 = settled cinematic mode
+        """
+        if self._rapid_frames == 0:
+            return 0.0
+        t = min(self._rapid_frames / 10.0, 1.0)
+        return t
+
+
 @dataclass
 class MultiHypothesisSmoother:
-    """Three parallel smoothers with voting for robust crop position."""
-    smoother_a: CropSmoother = field(default_factory=lambda: CropSmoother(min_cutoff=0.8, beta=0.2))
-    smoother_b: CropSmoother = field(default_factory=lambda: CropSmoother(min_cutoff=1.5, beta=0.5))
-    smoother_c: CropSmoother = field(default_factory=lambda: CropSmoother(min_cutoff=2.5, beta=0.8))
-    weights: Tuple[float, float, float] = (0.4, 0.35, 0.25)
+    """Three parallel smoothers with voting for robust crop position.
 
-    def update(self, x: float, y: float, t: float) -> Tuple[float, float]:
-        """Update all smoothers and return weighted vote."""
-        ax, ay = self.smoother_a.update(x, y, t)
-        bx, by = self.smoother_b.update(x, y, t)
-        cx, cy = self.smoother_c.update(x, y, t)
+    Uses CinematicCropSmoother (with lead) for responsive + anticipatory tracking.
+    The lead position is used when rapid movement is detected; normal position
+    otherwise.
+    """
+    smoother_a: object = field(default_factory=lambda: CinematicCropSmoother(min_cutoff=0.6, beta=0.15, lead_factor=0.20))
+    smoother_b: object = field(default_factory=lambda: CinematicCropSmoother(min_cutoff=1.2, beta=0.4, lead_factor=0.15))
+    smoother_c: object = field(default_factory=lambda: CinematicCropSmoother(min_cutoff=2.0, beta=0.6, lead_factor=0.10))
+    weights: Tuple[float, float, float] = (0.30, 0.45, 0.25)
+    rapid_detector: RapidMovementDetector = field(default_factory=RapidMovementDetector)
 
-        result_x = self.weights[0] * ax + self.weights[1] * bx + self.weights[2] * cx
-        result_y = self.weights[0] * ay + self.weights[1] * by + self.weights[2] * cy
+    def update(self, x: float, y: float, t: float, vx: float = 0.0, vy: float = 0.0) -> Tuple[float, float, float, float]:
+        """Update smoothers and return (smoothed_x, smoothed_y, lead_x, lead_y).
 
-        return result_x, result_y
+        lead positions come from the most responsive smoother (a).
+        """
+        is_rapid = self.rapid_detector.update(vx, vy, dt=0.1)
+
+        if is_rapid:
+            w = (0.5, 0.35, 0.15)
+        else:
+            w = self.weights
+
+        ax, ay, lead_ax, lead_ay = self.smoother_a.update(x, y, t)
+        bx, by, lead_bx, lead_by = self.smoother_b.update(x, y, t)
+        cx, cy, lead_cx, lead_cy = self.smoother_c.update(x, y, t)
+
+        result_x = w[0] * ax + w[1] * bx + w[2] * cx
+        result_y = w[0] * ay + w[1] * by + w[2] * cy
+
+        lead_x = lead_ax
+        lead_y = lead_ay
+
+        return result_x, result_y, lead_x, lead_y
+
+    def update_legacy(self, x: float, y: float, t: float) -> Tuple[float, float]:
+        """Legacy method for code that expects (smoothed_x, smoothed_y)."""
+        sx, sy, _, _ = self.update(x, y, t, vx=0.0, vy=0.0)
+        return sx, sy
 
     def reset(self):
-        """Reset all smoothers."""
         self.smoother_a.reset()
         self.smoother_b.reset()
         self.smoother_c.reset()
+        self.rapid_detector = RapidMovementDetector()
 
 
 @dataclass
@@ -210,7 +305,7 @@ class SpeakerTracker:
 
         # Use shorter interval for portrait mode when adaptive_interval is enabled
         if self.adaptive_interval and portrait_mode:
-            interval = 0.1
+            interval = 0.15  # 0.15 * 1.0 multiplier = 0.15s interval (6.7 Hz)
 
         print(f"SpeakerTracker: High-frequency face detection (interval={interval:.3f}s)...")
 
@@ -304,7 +399,7 @@ class SpeakerTracker:
         if clip_segments:
             timestamps: List[float] = []
             # Use half interval in clip segments for higher detection resolution
-            effective_interval = interval * 0.5 if portrait_mode else interval
+            effective_interval = interval * 0.25 if portrait_mode else interval
             for seg in clip_segments:
                 start = max(0.0, float(seg.get("start", 0)))
                 end = min(duration, float(seg.get("end", start)))
@@ -859,21 +954,42 @@ class SpeakerTracker:
             # Check for speaker change - reset smoother on new speaker
             if last_speaker is not None and speaker != last_speaker:
                 self._multi_smoother.reset()
-                self._multi_smoother.update(raw_x, raw_y, t)
-                smoothed_x, smoothed_y = raw_x, raw_y
+                smoothed_x, smoothed_y = self._multi_smoother.update_legacy(raw_x, raw_y, t)
             else:
+                # Get Kalman velocity for rapid movement detection
+                vx, vy = 0.0, 0.0
+                if track_id in track_stats:
+                    samples = track_stats[track_id].get("samples", [])
+                    if len(samples) >= 2:
+                        dt_total = samples[-1]["time"] - samples[0]["time"]
+                        if dt_total > 0:
+                            vx = (samples[-1]["x"] - samples[0]["x"]) / dt_total
+                            vy = (samples[-1]["y"] - samples[0]["y"]) / dt_total
+
                 # Pass through multi-hypothesis smoother
-                smoothed_x, smoothed_y = self._multi_smoother.update(raw_x, raw_y, t)
-                # If smoother output differs from raw by less than 2% of frame, use smoother
-                diff_x = abs(smoothed_x - raw_x)
-                diff_y = abs(smoothed_y - raw_y)
-                if diff_x < 0.02 and diff_y < 0.02:
-                    # Use smoother output (reduces shake)
-                    pass
+                smoothed_x, smoothed_y, lead_x, lead_y = self._multi_smoother.update(
+                    raw_x, raw_y, t, vx=vx, vy=vy
+                )
+
+                # Use lead position when rapid movement detected
+                rapid = self._multi_smoother.rapid_detector.is_rapid
+                if rapid:
+                    final_x = lead_x
+                    final_y = lead_y
                 else:
-                    # Raw differs too much from smoother - use weighted blend
-                    smoothed_x = 0.7 * smoothed_x + 0.3 * raw_x
-                    smoothed_y = 0.7 * smoothed_y + 0.3 * raw_y
+                    final_x = smoothed_x
+                    final_y = smoothed_y
+
+                # Blend if smoother diverges significantly from raw
+                diff_x = abs(final_x - raw_x)
+                diff_y = abs(final_y - raw_y)
+                if diff_x < 0.02 and diff_y < 0.02:
+                    pass  # Use smooth/lead output
+                else:
+                    final_x = 0.7 * final_x + 0.3 * raw_x
+                    final_y = 0.7 * final_y + 0.3 * raw_y
+
+                smoothed_x, smoothed_y = final_x, final_y
 
             last_x = smoothed_x
             last_y = smoothed_y

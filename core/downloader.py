@@ -11,6 +11,7 @@ def get_video_info(url: str) -> dict:
         "yt-dlp",
         "--dump-json",
         "--no-download",
+        "--remote-components", "ejs:npm",
         url
     ]
     try:
@@ -51,7 +52,7 @@ def download_video(url: str, progress_callback=None, output_dir=None) -> Path:
 
     cmd = [
         "yt-dlp",
-        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "-f", "best[ext=mp4]/best",
         "-o", str(output_path),
         "--no-progress",
         url

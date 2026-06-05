@@ -187,7 +187,16 @@ class FaceDetector:
                 bbox_w = x2 - x1
                 bbox_h = y2 - y1
                 center_x = (x1 + x2) / 2 / frame_w
-                center_y = (y1 + y2) / 2 / frame_h
+
+                eye_y = None
+                if landmarks and len(landmarks) >= 2:
+                    lm0_y = landmarks[0].y
+                    lm1_y = landmarks[1].y
+                    eye_y = (lm0_y + lm1_y) / 2.0
+                if eye_y is not None:
+                    center_y = eye_y  # already normalized (0-1)
+                else:
+                    center_y = (y1 + y2) / 2 / frame_h * 0.85
 
                 speaking_score = 0.0
                 categories = face_blendshapes[idx] if idx < len(face_blendshapes) else []
@@ -263,7 +272,16 @@ class FaceDetector:
                 continue
 
             center_x = (x1 + x2) / 2 / frame_w
-            center_y = (y1 + y2) / 2 / frame_h
+
+            eye_y = None
+            if landmarks and len(landmarks) >= 2:
+                lm0_y = landmarks[0][1]
+                lm1_y = landmarks[1].y
+                eye_y = (lm0_y + lm1_y) / 2.0
+            if eye_y is not None:
+                center_y = eye_y / frame_h
+            else:
+                center_y = (y1 + y2) / 2 / frame_h * 0.85
 
             landmarks = None
             if hasattr(face, "landmark") and face.landmark is not None:
@@ -286,13 +304,12 @@ class FaceDetector:
         return detections
 
     def _build_detection_regions(self, frame_w: int, frame_h: int) -> List[Dict[str, float]]:
-        """Build full-frame and zoomed half-frame regions for small podcast faces."""
+        """Full frame + 2 focused regions for small podcast faces. 3 regions instead of 4."""
         mid_x = frame_w // 2
         return [
             {"x1": 0, "y1": 0, "x2": frame_w, "y2": frame_h, "scale_up": 1.0},
             {"x1": 0, "y1": 0, "x2": mid_x + frame_w // 10, "y2": frame_h, "scale_up": 1.75},
             {"x1": max(0, mid_x - frame_w // 10), "y1": 0, "x2": frame_w, "y2": frame_h, "scale_up": 1.75},
-            {"x1": 0, "y1": 0, "x2": frame_w, "y2": int(frame_h * 0.75), "scale_up": 1.5},
         ]
 
     def _dedupe_detections(self, detections: List[FaceDetection]) -> List[FaceDetection]:
