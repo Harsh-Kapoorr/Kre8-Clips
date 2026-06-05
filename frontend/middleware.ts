@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "kre8-clips-secret-change-in-production-min-32-chars"
-)
+const PROTECTED_PATHS = ["/api/jobs/", "/api/account/", "/api/feedback"]
 
-const PROTECTED_PATHS = ["/api/jobs/"]
+function getSecretKey(): Uint8Array {
+  const JWT_SECRET = process.env.JWT_SECRET
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET environment variable is required")
+  }
+  return new TextEncoder().encode(JWT_SECRET)
+}
 
 async function verifyAccessToken(token: string): Promise<{ sub: string; email: string; name: string; plan: string; clips_used: number } | null> {
   try {
     const { jwtVerify } = await import("jose")
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token, getSecretKey())
     return payload as any
   } catch {
     return null
@@ -46,5 +50,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/jobs/:path*"],
+  matcher: ["/api/jobs/:path*", "/api/account/:path*", "/api/feedback"],
 }

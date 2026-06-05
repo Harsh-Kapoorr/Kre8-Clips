@@ -5,7 +5,7 @@ import { createUserSession } from "@/backend/auth/jwt"
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams
   const code = searchParams.get("code")
-  const state = searchParams.get("state") || "login"
+  const stateParam = searchParams.get("state")
   const error = searchParams.get("error")
 
   if (error) {
@@ -15,6 +15,24 @@ export async function GET(req: NextRequest) {
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=missing_code", req.url))
   }
+
+  const storedState = req.cookies.get("oauth_state")?.value
+  if (!storedState || !stateParam) {
+    return NextResponse.redirect(new URL("/login?error=invalid_state", req.url))
+  }
+
+  let stateData: { mode: string; nonce: string }
+  try {
+    stateData = JSON.parse(Buffer.from(stateParam, "base64url").toString())
+  } catch {
+    return NextResponse.redirect(new URL("/login?error=invalid_state", req.url))
+  }
+
+  if (stateData.nonce !== storedState) {
+    return NextResponse.redirect(new URL("/login?error=invalid_state", req.url))
+  }
+
+  const mode = stateData.mode
 
   try {
     const clientId = process.env.GOOGLE_CLIENT_ID
@@ -58,7 +76,7 @@ export async function GET(req: NextRequest) {
     }
 
     const session = await createUserSession(user.id)
-    const redirectUrl = state === "signup" ? "/?just_signed_up=true" : "/?just_logged_in=true"
+    const redirectUrl = mode === "signup" ? "/?just_signed_up=true" : "/?just_logged_in=true"
 
     const response = NextResponse.redirect(new URL(redirectUrl, req.url))
     response.cookies.set("refresh_token", session.refreshToken, {
@@ -68,6 +86,7 @@ export async function GET(req: NextRequest) {
       path: "/",
       maxAge: 7 * 24 * 60 * 60,
     })
+    response.cookies.delete("oauth_state")
 
     return response
   } catch (err) {

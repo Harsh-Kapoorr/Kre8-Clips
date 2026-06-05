@@ -1,11 +1,15 @@
 import { SignJWT, jwtVerify } from "jose"
 import { createSession, findSessionByToken, deleteSession, findUserById } from "./db"
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "kre8-clips-secret-change-in-production-min-32-chars"
-)
-
 const ACCESS_TOKEN_TTL = "15m"
+
+function getSecretKey(): Uint8Array {
+  const JWT_SECRET = process.env.JWT_SECRET
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET environment variable is required")
+  }
+  return new TextEncoder().encode(JWT_SECRET)
+}
 
 function generateRefreshToken(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -21,12 +25,12 @@ export async function signAccessToken(user: { id: string; email: string; name: s
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(ACCESS_TOKEN_TTL)
-    .sign(JWT_SECRET)
+    .sign(getSecretKey())
 }
 
 export async function verifyAccessToken(token: string): Promise<{ sub: string; email: string; name: string; plan: string; clips_used: number } | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token, getSecretKey())
     return payload as any
   } catch {
     return null

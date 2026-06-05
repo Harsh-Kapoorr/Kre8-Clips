@@ -3,7 +3,34 @@ import { createUser, findUserByEmail } from "@/backend/auth/db"
 import { hashPassword } from "@/backend/auth/password"
 import { createUserSession } from "@/backend/auth/jwt"
 
+const signupAttempts = new Map<string, { count: number; resetAt: number }>()
+const MAX_ATTEMPTS = 10
+const WINDOW_MS = 60 * 1000
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const attempt = signupAttempts.get(ip)
+  
+  if (!attempt || now > attempt.resetAt) {
+    signupAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS })
+    return true
+  }
+  
+  if (attempt.count >= MAX_ATTEMPTS) {
+    return false
+  }
+  
+  attempt.count++
+  return true
+}
+
 export async function POST(req: NextRequest) {
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown"
+  
+  if (!checkRateLimit(clientIp)) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 })
+  }
+
   try {
     const { email, password, name } = await req.json()
     
