@@ -3,12 +3,9 @@ import { Inter, Instrument_Serif, JetBrains_Mono } from "next/font/google"
 import { CustomCursor } from "@/components/custom-cursor"
 import { AuthInitializer } from "@/components/auth-initializer"
 import { ToastProvider } from "@/components/toast-provider"
-import { inject } from "@vercel/analytics"
-import { injectSpeedInsights } from "@vercel/speed-insights"
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import "./globals.css"
-
-inject()
-injectSpeedInsights()
 
 const inter = Inter({
   variable: "--font-sans",
@@ -75,6 +72,8 @@ export default function RootLayout({
         <ToastProvider>
           {children}
         </ToastProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
