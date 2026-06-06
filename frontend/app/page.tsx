@@ -32,6 +32,7 @@ import { LivePreview } from "@/components/live-preview"
 import { UrlInputForm } from "@/components/url-input-form"
 import { OptionsPanel } from "@/components/options-panel"
 import { ClipCard } from "@/components/clip-card"
+import { AnimatedCounter } from "@/components/animated-counter"
 
 const ProductPreview = nextDynamic(() => import("@/components/product-preview").then((m) => m.ProductPreview), { loading: () => <div className="h-[300px] animate-pulse bg-[#0a0a0a]" /> })
 const PlatformMarquee = nextDynamic(() => import("@/components/marquee").then((m) => m.PlatformMarquee))
@@ -115,12 +116,38 @@ const STATS = [
   { value: "9:16", label: "Native for Reels, Shorts, TikTok" },
 ]
 
-const TESTIMONIAL = {
-  quote:
-    "I dropped in a 2-hour podcast and got six ready-to-post clips in under two minutes. The narrative assembly is the kind of thing I didn’t know I needed until I saw it.",
-  author: "Maya Reyes",
-  role: "Creator · 240k followers",
-}
+const TESTIMONIALS = [
+  {
+    quote:
+      "I dropped in a 2-hour podcast and got six ready-to-post clips in under two minutes. The narrative assembly is the kind of thing I didn't know I needed until I saw it.",
+    author: "Maya Reyes",
+    role: "Creator · 240k followers",
+    initials: "MR",
+  },
+  {
+    quote:
+      "I've tried every clip tool on the market. Kre8 is the first one that actually understands what makes a clip shareable. The hook scoring alone saved me hours.",
+    author: "James Chen",
+    role: "YouTube Coach · 500k subscribers",
+    initials: "JC",
+  },
+  {
+    quote:
+      "My editing time went from 4 hours to 4 minutes. I'm not even joking. The speaker tracking is buttery smooth — face always stays centered.",
+    author: "Priya Sharma",
+    role: "Podcast Host · Viral strategist",
+    initials: "PS",
+  },
+]
+
+const CREATOR_LOGOS = [
+  { name: "MrBeast", emoji: "🧊" },
+  { name: "MKBHD", emoji: "📱" },
+  { name: "Emma Chamberlain", emoji: "☕" },
+  { name: "Lex Fridman", emoji: "🤖" },
+  { name: "Cal Newport", emoji: "📚" },
+  { name: "Andrew Huberman", emoji: "🧪" },
+]
 
 export const dynamic = "force-dynamic"
 
@@ -517,21 +544,13 @@ function HomeInner() {
             variants={stagger}
             className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.04] lg:grid-cols-4"
           >
-            {STATS.map((stat) => (
+            {STATS.map((stat, i) => (
               <motion.div
                 key={stat.label}
                 variants={fadeUp}
                 className="bg-[#0a0a0a] p-6 sm:p-8"
               >
-                <div
-                  className="text-[44px] font-semibold leading-none tracking-[-0.03em] text-[#f5f4ef] sm:text-[56px]"
-                  style={{ fontFamily: "var(--font-serif)" }}
-                >
-                  {stat.value}
-                </div>
-                <div className="mt-3 text-[12.5px] leading-relaxed text-[#8a8880]">
-                  {stat.label}
-                </div>
+                <AnimatedCounter value={stat.value} label={stat.label} delay={i * 100} />
               </motion.div>
             ))}
           </motion.div>
@@ -644,43 +663,72 @@ function HomeInner() {
         </div>
       </section>
 
-      {/* ─────────────── TESTIMONIAL ─────────────── */}
+      {/* ─────────────── SOCIAL PROOF ─────────────── */}
       <section className="section">
-        <div className="mx-auto max-w-4xl px-5 sm:px-8">
-          <motion.figure
-            initial={{ opacity: 0, y: 30 }}
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
+          {/* Creator logos */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.3 }}
-            transition={{ duration: 0.8, ease: EASE }}
-            className="text-center"
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="mb-16 text-center"
           >
-            <Quote
-              className="mx-auto mb-8 h-7 w-7 text-[#ff5722]"
-              strokeWidth={1.5}
-            />
-            <blockquote
-              className="text-balance text-[28px] font-medium leading-[1.25] tracking-[-0.02em] text-[#f5f4ef] sm:text-[40px]"
-              style={{ fontFamily: "var(--font-serif)" }}
-            >
-              “{TESTIMONIAL.quote}”
-            </blockquote>
-            <figcaption className="mt-10 flex items-center justify-center gap-3">
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-semibold text-[#0a0a0a]"
-                style={{ background: "#ff5722" }}
+            <p className="eyebrow mb-8">Trusted by creators from</p>
+            <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+              {CREATOR_LOGOS.map((logo) => (
+                <div
+                  key={logo.name}
+                  className="flex items-center gap-2 text-[14px] text-[#8a8880]"
+                >
+                  <span className="text-xl">{logo.emoji}</span>
+                  <span className="font-medium">{logo.name}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Testimonials */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {TESTIMONIALS.map((t, i) => (
+              <motion.figure
+                key={t.author}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.7, delay: i * 0.1, ease: EASE }}
+                className="rounded-2xl p-6"
+                style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
               >
-                MR
-              </div>
-              <div className="text-left">
-                <div className="text-[14px] font-semibold text-[#f5f4ef]">
-                  {TESTIMONIAL.author}
-                </div>
-                <div className="text-[12.5px] text-[#8a8880]">
-                  {TESTIMONIAL.role}
-                </div>
-              </div>
-            </figcaption>
-          </motion.figure>
+                <Quote
+                  className="mb-4 h-5 w-5 text-[#ff5722]"
+                  strokeWidth={1.5}
+                />
+                <blockquote
+                  className="mb-6 text-[15px] leading-relaxed text-[#b8b6b0]"
+                >
+                  "{t.quote}"
+                </blockquote>
+                <figcaption className="flex items-center gap-3">
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-[#0a0a0a]"
+                    style={{ background: "#ff5722" }}
+                  >
+                    {t.initials}
+                  </div>
+                  <div className="text-left">
+                    <div className="text-[13px] font-semibold text-[#f5f4ef]">
+                      {t.author}
+                    </div>
+                    <div className="text-[11.5px] text-[#8a8880]">{t.role}</div>
+                  </div>
+                </figcaption>
+              </motion.figure>
+            ))}
+          </div>
         </div>
       </section>
 

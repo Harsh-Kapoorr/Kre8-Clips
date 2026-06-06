@@ -4,28 +4,23 @@ const COLUMNS = [
   {
     title: "Product",
     links: [
-      { label: "How it works", href: "#how" },
-      { label: "Capabilities", href: "#product" },
-      { label: "Pricing", href: "#pricing" },
-      { label: "Changelog", href: "#changelog" },
-    ],
+      { label: "How it works", href: "/#how" },
+      { label: "Capabilities", href: "/#product" },
+      { label: "Pricing", href: "/pricing" },
+ ],
   },
   {
     title: "Resources",
     links: [
-      { label: "Documentation", href: "#docs" },
-      { label: "API reference", href: "#api" },
-      { label: "Prompt library", href: "#prompts" },
-      { label: "Status", href: "#status" },
+      { label: "GitHub", href: "https://github.com/Harsh-Kapoorr/Kre8-Clips" },
+      { label: "API Docs", href: "/#docs" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "About", href: "#about" },
-      { label: "Twitter / X", href: "#twitter" },
-      { label: "GitHub", href: "#github" },
-      { label: "Contact", href: "#contact" },
+      { label: "Twitter / X", href: "https://twitter.com/kre8clips" },
+      { label: "GitHub", href: "https://github.com/Harsh-Kapoorr/Kre8-Clips" },
     ],
   },
   {
@@ -76,14 +71,18 @@ export function SiteFooter() {
             </p>
             <div className="mt-7 flex items-center gap-2">
               <a
-                href="#github"
+                href="https://github.com/Harsh-Kapoorr/Kre8-Clips"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="GitHub"
                 className="flex h-9 w-9 items-center justify-center rounded-md border border-white/[0.08] text-[#8a8880] transition-colors hover:border-[#ff5722] hover:text-[#ff5722]"
               >
                 <GithubIcon className="h-4 w-4" />
               </a>
               <a
-                href="#twitter"
+                href="https://twitter.com/kre8clips"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="Twitter"
                 className="flex h-9 w-9 items-center justify-center rounded-md border border-white/[0.08] text-[#8a8880] transition-colors hover:border-[#ff5722] hover:text-[#ff5722]"
               >
